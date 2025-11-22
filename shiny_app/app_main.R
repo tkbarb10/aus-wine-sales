@@ -8,6 +8,8 @@ library(tidyverse)
 library(gt)
 library(here)
 library(patchwork) # For arranging multiple plots
+library(bslib)     # For collapsible sidebar layouts
+library(bsicons)   # For tooltip icons
 
 ##############################
 # ---- Data Import -----
@@ -44,6 +46,8 @@ year_choices <- wine_ts |> distinct(year = year(Month)) |> arrange(year) |> pull
 ##############################
 
 ui <- fluidPage(
+    # Upgrade to Bootstrap 5 to support bslib components like layout_sidebar
+    theme = bs_theme(version = 5),
     
     titlePanel("Australian Wine Sales: Explore, Model, Forecast"),
     
@@ -55,8 +59,12 @@ ui <- fluidPage(
         tabPanel(
             "Explore",
             
-            sidebarLayout(
-                sidebarPanel(
+            layout_sidebar(
+                fillable = FALSE,
+                sidebar = sidebar(
+                    title = "Explore Options",
+                    open = "open",
+                    
                     h4("Explore time series"),
                     
                     checkboxGroupInput(
@@ -82,17 +90,16 @@ ui <- fluidPage(
                         selected = "ts"
                     ),
                     
-                    # Dynamic UI for STL selection (Only shows when STL is chosen)
+                    # Dynamic UI for STL selection
                     uiOutput("explore_stl_ui")
                 ),
                 
-                mainPanel(
-                    h3("Time Series & Decomposition"),
-                    plotOutput("explore_plot", height = "500px"),
-                    hr(),
-                    h3("Summary statistics"),
-                    gt_output("explore_summary")
-                )
+                # --- Main Content ---
+                h3("Time Series & Decomposition"),
+                plotOutput("explore_plot", height = "500px"),
+                hr(),
+                h3("Summary statistics"),
+                gt_output("explore_summary")
             )
         ),
         
@@ -102,8 +109,12 @@ ui <- fluidPage(
         tabPanel(
             "Model Building",
             
-            sidebarLayout(
-                sidebarPanel(
+            layout_sidebar(
+                fillable = FALSE,
+                sidebar = sidebar(
+                    title = "Model Options",
+                    open = "open",
+                    
                     h4("Model setup"),
                     
                     selectInput(
@@ -124,6 +135,16 @@ ui <- fluidPage(
                         selected = "ETS"
                     ),
                     
+                    # --- New Customization Toggle ---
+                    checkboxInput(
+                        inputId = "model_customize",
+                        label = "Customize Model Parameters",
+                        value = FALSE
+                    ),
+                    
+                    # Dynamic UI for Custom Params
+                    uiOutput("model_custom_ui"),
+                    
                     sliderInput(
                         inputId = "model_horizon_years",
                         label = "Forecast horizon (years, also defines training cutoff)",
@@ -135,7 +156,8 @@ ui <- fluidPage(
                     
                     actionButton(
                         inputId = "build_model",
-                        label = "Build model"
+                        label = "Build model",
+                        class = "btn-primary"
                     ),
                     
                     hr(),
@@ -149,22 +171,21 @@ ui <- fluidPage(
                     )
                 ),
                 
-                mainPanel(
-                    h3("Training data and model"),
-                    
-                    verbatimTextOutput("model_training_info"),
-                    
-                    h4("Model report (Last Built)"),
-                    verbatimTextOutput("model_report"),
-                    
-                    hr(),
-                    h3("Model Build History"),
-                    gt_output("model_history_table"),
-                    
-                    hr(),
-                    h3("Training accuracy metrics"),
-                    gt_output("model_training_accuracy")
-                )
+                # --- Main Content ---
+                h3("Training data and model"),
+                
+                verbatimTextOutput("model_training_info"),
+                
+                h4("Model report (Last Built)"),
+                verbatimTextOutput("model_report"),
+                
+                hr(),
+                h3("Model Build History"),
+                gt_output("model_history_table"),
+                
+                hr(),
+                h3("Training accuracy metrics"),
+                gt_output("model_training_accuracy")
             )
         ),
         
@@ -174,8 +195,12 @@ ui <- fluidPage(
         tabPanel(
             "Forecasting",
             
-            sidebarLayout(
-                sidebarPanel(
+            layout_sidebar(
+                fillable = FALSE,
+                sidebar = sidebar(
+                    title = "Forecast Options",
+                    open = "open",
+                    
                     h4("Forecasting & validation"),
                     
                     uiOutput("forecast_model_choices_ui"),
@@ -184,22 +209,21 @@ ui <- fluidPage(
                     
                     actionButton(
                         inputId = "run_forecast",
-                        label = "Run forecasts"
+                        label = "Run forecasts",
+                        class = "btn-primary"
                     ),
                     
                     helpText("Select models above to compare validation metrics."),
                     helpText("NOTE: The Forecast Plot will only display the first 4 selections.")
                 ),
                 
-                mainPanel(
-                    h3("Validation metrics (forecast period)"),
-                    gt_output("forecast_metrics"),
-                    
-                    hr(),
-                    h3("Forecast plots"),
-                    # Increased height to accommodate stacked plots
-                    plotOutput("forecast_plot", height = "800px") 
-                )
+                # --- Main Content ---
+                h3("Validation metrics (forecast period)"),
+                gt_output("forecast_metrics"),
+                
+                hr(),
+                h3("Forecast plots"),
+                plotOutput("forecast_plot", height = "800px")
             )
         )
     )
@@ -329,6 +353,75 @@ server <- function(input, output, session) {
         BuiltAt   = as.POSIXct(NA)[-1]
     ))
     
+    # --- Dynamic UI: Custom Model Parameters ---
+    output$model_custom_ui <- renderUI({
+        req(input$model_customize)
+        
+        type <- input$model_type
+        
+        if (type == "ETS") {
+            tagList(
+                div(
+                    class = "d-flex align-items-center",
+                    selectInput("ets_error", "Error Type", 
+                                choices = c("Auto" = "Z", "Additive" = "A", "Multiplicative" = "M"), 
+                                width = "100%"),
+                    tooltip(bs_icon("info-circle", class="ms-2"), 
+                            "Controls how error is applied. 'Auto' lets the model decide.")
+                ),
+                div(
+                    class = "d-flex align-items-center",
+                    selectInput("ets_trend", "Trend Type", 
+                                choices = c("Auto" = "Z", "None" = "N", "Additive" = "A", "Multiplicative" = "M", "Damped" = "Ad"),
+                                width = "100%"),
+                    tooltip(bs_icon("info-circle", class="ms-2"), 
+                            "Controls the trend component. 'Damped' flattens the trend over time.")
+                ),
+                div(
+                    class = "d-flex align-items-center",
+                    selectInput("ets_season", "Seasonality", 
+                                choices = c("Auto" = "Z", "None" = "N", "Additive" = "A", "Multiplicative" = "M"),
+                                width = "100%"),
+                    tooltip(bs_icon("info-circle", class="ms-2"), 
+                            "Controls seasonal patterns. 'Multiplicative' is good for expanding variance.")
+                )
+            )
+        } else if (type == "ARIMA") {
+            tagList(
+                h6("Non-Seasonal (p, d, q)"),
+                div(
+                    class = "row g-2",
+                    div(class="col-4", numericInput("arima_p", "p", value = NA, min = 0)),
+                    div(class="col-4", numericInput("arima_d", "d", value = NA, min = 0)),
+                    div(class="col-4", numericInput("arima_q", "q", value = NA, min = 0))
+                ),
+                tooltip(bs_icon("info-circle"), "Autoregressive (p), Differencing (d), Moving Average (q). Leave blank for Auto."),
+                
+                h6("Seasonal (P, D, Q)"),
+                div(
+                    class = "row g-2",
+                    div(class="col-4", numericInput("arima_P", "P", value = NA, min = 0)),
+                    div(class="col-4", numericInput("arima_D", "D", value = NA, min = 0)),
+                    div(class="col-4", numericInput("arima_Q", "Q", value = NA, min = 0))
+                ),
+                tooltip(bs_icon("info-circle"), "Seasonal components. Leave blank to let the model decide.")
+            )
+        } else if (type == "TSLM") {
+            tagList(
+                div(
+                    class = "d-flex align-items-center mb-2",
+                    checkboxInput("tslm_trend", "Include Trend", value = TRUE),
+                    tooltip(bs_icon("info-circle", class="ms-2"), "Captures long-term increase or decrease.")
+                ),
+                div(
+                    class = "d-flex align-items-center",
+                    checkboxInput("tslm_season", "Include Seasonality", value = TRUE),
+                    tooltip(bs_icon("info-circle", class="ms-2"), "Captures repeating yearly patterns.")
+                )
+            )
+        }
+    })
+    
     observeEvent(input$build_model, {
         req(input$model_varietal, input$model_type, input$model_horizon_years)
         
@@ -340,19 +433,56 @@ server <- function(input, output, session) {
             filter(year(Month) <= trn_cutoff_year)
         
         varietal_choice <- input$model_varietal
+        type <- input$model_type
+        is_custom <- input$model_customize
         
-        model_spec <- switch(
-            input$model_type,
-            "ETS"   = ETS(Sales),
-            "ARIMA" = ARIMA(Sales),
-            "TSLM"  = TSLM(Sales ~ trend() + season())
-        )
+        # --- Dynamic Model Definition ---
+        model_spec <- if (!is_custom) {
+            # DEFAULT AUTO MODES
+            switch(type,
+                   "ETS"   = ETS(Sales),
+                   "ARIMA" = ARIMA(Sales),
+                   "TSLM"  = TSLM(Sales ~ trend() + season())
+            )
+        } else {
+            # CUSTOM MODES
+            if (type == "ETS") {
+                # Use "Z" (Auto) if input is missing or set to Z
+                e <- if(is.null(input$ets_error)) "Z" else input$ets_error
+                t <- if(is.null(input$ets_trend)) "Z" else input$ets_trend
+                s <- if(is.null(input$ets_season)) "Z" else input$ets_season
+                ETS(Sales ~ error(e) + trend(t) + season(s))
+                
+            } else if (type == "ARIMA") {
+                # Default search ranges in fable if input is NA:
+                # p=0:5, d=0:2, q=0:5, P=0:2, D=0:1, Q=0:2
+                p_arg <- if(is.na(input$arima_p)) 0:5 else input$arima_p
+                d_arg <- if(is.na(input$arima_d)) 0:2 else input$arima_d
+                q_arg <- if(is.na(input$arima_q)) 0:5 else input$arima_q
+                
+                P_arg <- if(is.na(input$arima_P)) 0:2 else input$arima_P
+                D_arg <- if(is.na(input$arima_D)) 0:1 else input$arima_D
+                Q_arg <- if(is.na(input$arima_Q)) 0:2 else input$arima_Q
+                
+                ARIMA(Sales ~ pdq(p=p_arg, d=d_arg, q=q_arg) + PDQ(P=P_arg, D=D_arg, Q=Q_arg))
+                
+            } else if (type == "TSLM") {
+                # Build formula string
+                f <- "Sales ~ 1" # Intercept
+                if (isTRUE(input$tslm_trend))  f <- paste(f, "+ trend()")
+                if (isTRUE(input$tslm_season)) f <- paste(f, "+ season()")
+                
+                TSLM(as.formula(f))
+            }
+        }
         
         varietal_model <- trn_data |>
             filter(Varietal == varietal_choice) |>
             model(Model = model_spec)
         
-        key_name <- paste(varietal_choice, input$model_type, sep = " - ")
+        # Generate a distinct name for custom models
+        suffix <- if(is_custom) " (Custom)" else ""
+        key_name <- paste0(varietal_choice, " - ", type, suffix)
         
         # store model
         current_models <- built_models()
@@ -369,7 +499,7 @@ server <- function(input, output, session) {
         new_row <- tibble(
             ModelName = key_name,
             Varietal  = varietal_choice,
-            Type      = input$model_type,
+            Type      = paste0(type, suffix),
             Horizon   = horizon_years,
             TrainingCutoff = trn_cutoff_year,
             BuiltAt   = Sys.time()
@@ -414,7 +544,7 @@ server <- function(input, output, session) {
         }
         
         hist_df |>
-            arrange(desc(BuiltAt)) |>  # <--- FIXED: Arrange BEFORE selecting columns
+            arrange(desc(BuiltAt)) |>  
             select(ModelName, Varietal, Type, Horizon, TrainingCutoff) |>
             gt() |>
             fmt_number(
