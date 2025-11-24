@@ -45,217 +45,241 @@ year_choices <- wine_ts |> distinct(year = year(Month)) |> arrange(year) |> pull
 # ---- UI ----
 ##############################
 
-ui <- fluidPage(
-  # Upgrade to Bootstrap 5 to support bslib components like layout_sidebar
-  theme = bs_theme(version = 5),
+ui <- page_navbar(
+  title = tags$span(
+    class = "text-info fw-bold",
+    HTML("🍷 Australian Wine Sales")
+  ), 
   
-  titlePanel("Australian Wine Sales: Explore, Model, Forecast"),
+  theme = bs_theme(version = 5, bootswatch = 'cerulean'), 
   
-  tabsetPanel(
+  # Use fillable = FALSE so your plots don't stretch weirdly if you aren't using full-screen logic
+  fillable = FALSE, 
+  
+  ##############################
+  # ----- Tab 1: Explore ------
+  ##############################
+  nav_panel(
+    title = "Explore",
     
-    ##############################
-    # ----- Tab 1: Explore ------
-    ##############################
-    tabPanel(
-      "Explore",
-      
-      layout_sidebar(
-        fillable = FALSE,
-        sidebar = sidebar(
-          title = "Explore Options",
-          open = "open",
-          
-          h4("Explore time series"),
-          
-          checkboxGroupInput(
-            inputId = "explore_varietals",
-            label = "Select varietals",
-            choices = varietal_choices,
-            selected = varietal_choices
-          ),
-          
-          dateRangeInput(
-            inputId = "explore_daterange",
-            label = "Select date range",
-            start = as.Date(yearmonth(min_month)),
-            end   = as.Date(yearmonth(max_month)),
-            min   = as.Date(yearmonth(min_month)),
-            max   = as.Date(yearmonth(max_month))
-          ),
-          
-          radioButtons(
-            inputId = "explore_view",
-            label = "View type",
-            choices = c("Time series" = "ts", "STL decomposition" = "stl"),
-            selected = "ts"
-          ),
-          
-          # Dynamic UI for STL selection
-          uiOutput("explore_stl_ui")
+    layout_sidebar(
+      fillable = FALSE,
+      sidebar = sidebar(
+        open = "open",
+        
+        h4("Explore time series"),
+        
+        checkboxGroupInput(
+          inputId = "explore_varietals",
+          label = "Select varietals",
+          choices = varietal_choices,
+          selected = varietal_choices[1]
         ),
         
-        # --- Main Content ---
-        h3("Time Series & Decomposition"),
-        plotOutput("explore_plot", height = "600px"), # Increased height slightly
-        hr(),
+        dateRangeInput(
+          inputId = "explore_daterange",
+          label = "Select date range",
+          start = as.Date(yearmonth(min_month)),
+          end   = as.Date(yearmonth(max_month)),
+          min   = as.Date(yearmonth(min_month)),
+          max   = as.Date(yearmonth(max_month))
+        ),
         
-        # Collapsible Summary Statistics
-        accordion(
-          open = FALSE, # Default to collapsed
-          accordion_panel(
-            "Summary Statistics",
-            gt_output("explore_summary")
-          )
+        radioButtons(
+          inputId = "explore_view",
+          label = "View type",
+          choices = c("Time series" = "ts", "STL decomposition" = "stl"),
+          selected = "ts"
+        ),
+        
+        uiOutput("explore_stl_ui")
+      ),
+      
+      # --- Main Content ---
+      h3("Time Series & Decomposition"),
+      plotOutput("explore_plot", height = "600px"), 
+      hr(),
+      
+      accordion(
+        open = FALSE, 
+        accordion_panel(
+          title = tags$span(class = "text-primary", "Summary Statistics"),
+          value = 'summary_stats',
+          gt_output("explore_summary")
         )
       )
-    ),
+    )
+  ),
+  
+  ##############################
+  # ----- Tab 2: Modeling -----
+  ##############################
+  nav_panel(
+    title = "Model Building",
     
-    ##############################
-    # ----- Tab 2: Modeling -----
-    ##############################
-    tabPanel(
-      "Model Building",
-      
-      layout_sidebar(
-        fillable = FALSE,
-        sidebar = sidebar(
-          title = "Model Options",
-          open = "open",
-          
-          h4("Model setup"),
-          
-          # --- MOVED TO TOP ---
-          sliderInput(
-            inputId = "model_horizon_years",
-            label = "Forecast horizon (years, also defines training cutoff)",
-            min = 1,
-            max = 5,
-            value = 2,
-            step = 1
-          ),
-          
-          # --- Warning Text ---
-          div(
-            class = "alert alert-warning p-2", 
-            style = "font-size: 0.85rem;",
-            bs_icon("exclamation-triangle-fill"),
-            "Note: Changing the horizon and rebuilding a model will overwrite the previous version of that model type."
-          ),
-          
-          selectInput(
-            inputId = "model_varietal",
-            label = "Select varietal",
-            choices = varietal_choices,
-            selected = varietal_choices[1]
-          ),
-          
-          radioButtons(
-            inputId = "model_type",
-            label = "Model type",
-            choices = c(
-              "ETS"   = "ETS",
-              "ARIMA" = "ARIMA",
-              "TSLM"  = "TSLM"
-            ),
-            selected = "ETS"
-          ),
-          
-          # --- New Customization Toggle ---
-          checkboxInput(
-            inputId = "model_customize",
-            label = "Customize Model Parameters",
-            value = FALSE
-          ),
-          
-          # Dynamic UI for Custom Params
-          uiOutput("model_custom_ui"),
-          
-          actionButton(
-            inputId = "build_model",
-            label = "Build model",
-            class = "btn-primary"
-          ),
-          
-          hr(),
-          h4("Review & Compare"),
-          
-          # --- CHANGED: Add selector to view specific reports ---
-          selectInput(
-            inputId = "view_model_report",
-            label = "Select model to view report",
-            choices = NULL
-          ),
-          
-          selectInput(
-            inputId = "mb_metric_models",
-            label   = "Compare training metrics for models",
-            choices = NULL,      # filled from server
-            selected = NULL,
-            multiple = TRUE
-          )
+    layout_sidebar(
+      fillable = FALSE,
+      sidebar = sidebar(
+        open = "open",
+        
+        h4("Model setup"),
+        
+        sliderInput(
+          inputId = "model_horizon_years",
+          label = "Forecast horizon (years)",
+          min = 1,
+          max = 5,
+          value = 2,
+          step = 1
         ),
         
-        # --- Main Content ---
-        h3("Training data and model"),
+        div(
+          class = "alert alert-warning p-2", 
+          style = "font-size: 0.85rem;",
+          bs_icon("exclamation-triangle-fill"),
+          "Rebuilding overwrites previous models of the same type."
+        ),
         
-        verbatimTextOutput("model_training_info"),
+        selectInput(
+          inputId = "model_varietal",
+          label = "Select varietal",
+          choices = varietal_choices,
+          selected = varietal_choices[1]
+        ),
         
-        h4("Model report"),
-        verbatimTextOutput("model_report"),
+        radioButtons(
+          inputId = "model_type",
+          label = "Model type",
+          choices = c("ETS", "ARIMA", "TSLM"),
+          selected = "ETS"
+        ),
+        
+        checkboxInput(
+          inputId = "model_customize",
+          label = "Customize Model Parameters",
+          value = FALSE
+        ),
+        
+        uiOutput("model_custom_ui"),
+        
+        actionButton(
+          inputId = "build_model",
+          label = "Build model",
+          class = "btn-primary"
+        ),
         
         hr(),
-        h3("Training accuracy metrics"),
-        gt_output("model_training_accuracy"),
+        h4("Review & Compare"),
         
-        hr(),
+        selectInput(
+          inputId = "view_model_report",
+          label = "Select model to view report",
+          choices = NULL
+        ),
         
-        # Collapsible Model History (Moved below metrics)
-        accordion(
-          open = FALSE,
-          accordion_panel(
-            "Model Build History",
-            gt_output("model_history_table")
-          )
+        selectInput(
+          inputId = "mb_metric_models",
+          label   = "Compare training metrics",
+          choices = NULL,
+          selected = NULL,
+          multiple = TRUE
+        )
+      ),
+      
+      # --- Main Content ---
+      h3("Training data and model"),
+      verbatimTextOutput("model_training_info"),
+      
+      h4("Model report"),
+      uiOutput("model_report_ui"),
+      
+      hr(),
+      h3("Training accuracy metrics"),
+      gt_output("model_training_accuracy"),
+      hr(),
+      accordion(
+        open = FALSE,
+        accordion_panel(
+          title = tags$span(class = "text-primary", "Model Build History"),
+          value = "model_build",
+          gt_output("model_history_table")
         )
       )
-    ),
+    )
+  ),
+  
+  ##############################
+  # ----- Tab 3: Validation ----
+  ##############################
+  nav_panel(
+    title = "Validation",
     
-    ##############################
-    # ----- Tab 3: Forecasting ---
-    ##############################
-    tabPanel(
-      "Forecasting",
+    layout_sidebar(
+      fillable = FALSE,
+      sidebar = sidebar(
+        open = "open",
+        
+        h4("Validation Setup"),
+        uiOutput("forecast_model_choices_ui"),
+        uiOutput("forecast_clarity_year_ui"),
+        
+        actionButton(
+          inputId = "run_forecast",
+          label = "Run validation",
+          class = "btn-primary"
+        ),
+        helpText("Compare models against held-out data defined by the horizon.")
+      ),
       
-      layout_sidebar(
-        fillable = FALSE,
-        sidebar = sidebar(
-          title = "Forecast Options",
-          open = "open",
-          
-          h4("Forecasting & validation"),
-          
-          uiOutput("forecast_model_choices_ui"),
-          
-          uiOutput("forecast_clarity_year_ui"),
-          
-          actionButton(
-            inputId = "run_forecast",
-            label = "Run forecasts",
-            class = "btn-primary"
-          ),
-          
-          helpText("Select models above to compare validation metrics."),
-          helpText("NOTE: The Forecast Plot will only display the first 4 selections.")
+      h3("Validation metrics"),
+      gt_output("forecast_metrics"),
+      hr(),
+      h3("Validation plots"),
+      plotOutput("forecast_plot", height = "800px")
+    )
+  ),
+  
+  ##############################
+  # ----- Tab 4: Forecast ------
+  ##############################
+  nav_panel(
+    title = "Forecast",
+    
+    layout_sidebar(
+      fillable = FALSE,
+      sidebar = sidebar(
+        open = "open",
+        
+        h4("Future Forecast Setup"),
+        uiOutput("future_model_choices_ui"),
+        
+        sliderInput(
+          inputId = "future_horizon_months",
+          label = "Forecast Horizon (Months)",
+          min = 1,
+          max = 24,
+          value = 12,
+          step = 1
         ),
         
-        # --- Main Content ---
-        h3("Validation metrics (forecast period)"),
-        gt_output("forecast_metrics"),
+        uiOutput("future_clarity_year_ui"),
         
-        hr(),
-        h3("Forecast plots"),
-        plotOutput("forecast_plot", height = "800px")
-      )
+        actionButton(
+          inputId = "run_future_forecast",
+          label = "Run Forecast",
+          class = "btn-success"
+        ),
+        
+        div(
+          class = "alert alert-info p-2 mt-3", 
+          style = "font-size: 0.85rem;",
+          bs_icon("info-circle"),
+          "Models will be refitted to the full dataset before forecasting."
+        )
+      ),
+      
+      h3("Future Forecast Plots"),
+      plotOutput("future_plot", height = "800px")
     )
   )
 )
@@ -265,6 +289,8 @@ ui <- fluidPage(
 ##############################
 
 server <- function(input, output, session) {
+  
+  thematic::thematic_shiny()
   
   ##############################
   # Tab 1: Explore
@@ -537,7 +563,7 @@ server <- function(input, output, session) {
     )
     model_history(bind_rows(current_hist, new_row))
     
-    # --- CHANGED: Auto-select the new model in the report viewer ---
+    # Auto-select the new model in the report viewer
     updateSelectInput(session, "view_model_report", selected = key_name)
   })
   
@@ -558,23 +584,202 @@ server <- function(input, output, session) {
     )
   })
   
-  # --- CHANGED: Model report now uses the specific selector ---
-  output$model_report <- renderPrint({
+  # --- UPDATED: Centered values, TSLM Padding & Fixes ---
+  output$model_report_ui <- renderUI({
     current_models <- built_models()
     selected_key <- input$view_model_report
     
     if (length(current_models) == 0) {
-      cat("No model built yet. Click 'Build model' to create one.")
+      return(div(class="alert alert-warning", "No model built yet. Click 'Build model' to create one."))
     } else if (is.null(selected_key) || selected_key == "") {
-      cat("Select a model from the sidebar to view the report.")
-    } else {
-      cat("Model report for:", selected_key, "\n\n")
-      if (selected_key %in% names(current_models)) {
-        report(current_models[[selected_key]])
-      } else {
-        cat("Selected model not found.")
-      }
+      return(div(class="alert alert-info", "Select a model from the sidebar to view the report."))
     }
+    
+    # Retrieve model (mable)
+    if (!selected_key %in% names(current_models)) {
+      return(div(class="alert alert-danger", "Selected model not found."))
+    }
+    
+    mdl_mable <- current_models[[selected_key]]
+    
+    if (!"Model" %in% names(mdl_mable)) {
+      return(div("Model object structure invalid."))
+    }
+    
+    model_def <- mdl_mable$Model[[1]]
+    fit_obj   <- model_def$fit
+    
+    report_elements <- list()
+    
+    # 1. Header
+    model_str <- format(model_def)
+    report_elements[[1]] <- div(
+      class = "mb-3 p-2 bg-light border rounded",
+      h5("Model Structure", class="text-primary m-0"),
+      p(class = "m-0", style = "font-family: monospace; font-size: 1.1em;", model_str)
+    )
+    
+    # --- Helper: Clean TSLM Terms ---
+    clean_tslm_terms <- function(nms) {
+      if(is.null(nms)) return(character(0))
+      
+      nms <- str_replace(nms, fixed("(Intercept)"), "Intercept")
+      nms <- str_replace(nms, fixed("trend()"), "Trend")
+      
+      # Handle season()yearX -> Map to Month
+      # Extract number
+      season_matches <- str_match(nms, "season\\(\\)year(\\d+)")
+      
+      has_season <- !is.na(season_matches[,1])
+      if(any(has_season)) {
+        indices <- as.numeric(season_matches[has_season, 2])
+        # Indices are 1-12. Usually season()year2=Feb
+        valid_idx <- indices >= 1 & indices <= 12
+        
+        # Use abbreviated month names (Jan, Feb...)
+        nms[has_season][valid_idx] <- month.abb[indices[valid_idx]]
+      }
+      return(nms)
+    }
+    
+    # --- Helper: Robust Wide Tibble Conversion (used for ETS params) ---
+    to_wide_tibble <- function(x) {
+      if (is.null(x)) return(tibble())
+      if (!is.data.frame(x) && is.vector(x)) {
+        return(as_tibble(as.list(x)))
+      }
+      if (is.data.frame(x)) {
+        df <- as_tibble(x)
+        names_lower <- tolower(names(df))
+        if ("term" %in% names_lower && "estimate" %in% names_lower) {
+          df <- df |> pivot_wider(names_from = matches("term", ignore.case=TRUE), 
+                                  values_from = matches("estimate", ignore.case=TRUE))
+        } else if ("parameter" %in% names_lower && "value" %in% names_lower) {
+          df <- df |> pivot_wider(names_from = matches("parameter", ignore.case=TRUE), 
+                                  values_from = matches("value", ignore.case=TRUE))
+        }
+        return(df)
+      }
+      return(as_tibble(as.list(x)))
+    }
+    
+    # 2. Extract Details based on Type
+    if (inherits(fit_obj, "ETS")) {
+      
+      # Parameters Table (Wide)
+      if (!is.null(fit_obj$par)) {
+        df_par <- to_wide_tibble(fit_obj$par)
+        
+        # Capitalize columns
+        names(df_par) <- str_to_title(names(df_par))
+        
+        if ("L" %in% names(df_par)) {
+          df_par <- df_par |> rename(`Level (Intercept)` = L)
+        }
+        
+        tbl_par <- df_par |> 
+          gt() |> 
+          fmt_number(columns = where(is.numeric), decimals = 2) |> 
+          cols_align(align = "center") |>
+          tab_header(title = "Smoothing Parameters") |> 
+          as_raw_html()
+        
+        report_elements[[2]] <- div(class="mb-4", HTML(tbl_par))
+      }
+      
+    } else if (inherits(fit_obj, "ARIMA")) {
+      
+      # Coefficients (Vertical / Original format per request)
+      if (!is.null(fit_obj$par)) {
+        df_coef <- as_tibble(fit_obj$par)
+        
+        # Capitalize columns
+        names(df_coef) <- str_to_title(names(df_coef))
+        
+        tbl_coef <- df_coef |> 
+          gt() |> 
+          fmt_number(columns = where(is.numeric), decimals = 2) |> 
+          cols_align(align = "center") |>
+          tab_header(title = "Model Coefficients") |> 
+          as_raw_html()
+        
+        report_elements[[2]] <- div(class="mb-4", HTML(tbl_coef))
+      }
+      
+    } else if (inherits(fit_obj, "TSLM") || inherits(fit_obj, "lm")) {
+      
+      # Coefficients (Wide)
+      coefs <- tryCatch(coefficients(fit_obj), error = function(e) NULL)
+      
+      if (!is.null(coefs)) {
+        # FIX: Robustly handle names if missing to prevent "Size 0" tibble error
+        raw_names <- names(coefs)
+        
+        # If names() is NULL, it's likely a matrix/array. Try rownames/colnames.
+        if (is.null(raw_names) && (is.matrix(coefs) || is.array(coefs))) {
+          if (!is.null(rownames(coefs))) raw_names <- rownames(coefs)
+          else if (!is.null(colnames(coefs))) raw_names <- colnames(coefs)
+        }
+        
+        if (is.null(raw_names)) {
+          # Fallback if names are missing entirely
+          raw_names <- paste0("Term_", seq_along(coefs))
+        }
+        
+        nm <- clean_tslm_terms(raw_names)
+        
+        # Double check matching lengths
+        vals <- as.numeric(coefs)
+        
+        if (length(nm) == length(vals)) {
+          df_coef <- tibble(
+            Term = nm,
+            Estimate = vals
+          ) |>
+            pivot_wider(names_from = Term, values_from = Estimate)
+          
+          # Names are already Title case from the cleaner/pivot
+          
+          tbl_coef <- df_coef |> 
+            gt() |> 
+            fmt_number(columns = where(is.numeric), decimals = 2) |> 
+            cols_align(align = "center") |>
+            # Add padding to TSLM columns
+            cols_width(everything() ~ px(120)) |>
+            tab_header(title = "Coefficients") |> 
+            as_raw_html()
+          
+          report_elements[[2]] <- div(class="mb-4", HTML(tbl_coef))
+        } else {
+          report_elements[[2]] <- div(class="text-danger", "Error: Mismatched coefficient names.")
+        }
+      }
+      
+      # Goodness of Fit (Wide)
+      try({
+        s <- summary(fit_obj)
+        df_gof <- tibble(
+          `R-Squared` = s$r.squared,
+          `Adj. R-Squared` = s$adj.r.squared,
+          `Sigma` = s$sigma
+        )
+        
+        tbl_gof <- df_gof |> 
+          gt() |> 
+          fmt_number(columns = where(is.numeric), decimals = 2) |> 
+          cols_align(align = "center") |>
+          tab_header(title = "Fit Statistics") |> 
+          as_raw_html()
+        
+        report_elements[[3]] <- div(class="mb-4", HTML(tbl_gof))
+      }, silent = TRUE)
+      
+    } else {
+      # Fallback
+      report_elements[[2]] <- pre(capture.output(report(mdl_mable)))
+    }
+    
+    do.call(tagList, report_elements)
   })
   
   # --- Model History Table ---
@@ -611,8 +816,6 @@ server <- function(input, output, session) {
       updateSelectInput(session, "mb_metric_models", choices = model_names, selected = model_names)
       
       # Report viewer (single-select)
-      # We only update choices here. The selected value is handled by build_model 
-      # or maintained by Shiny if valid.
       updateSelectInput(session, "view_model_report", choices = model_names, selected = input$view_model_report)
     }
   })
@@ -651,11 +854,8 @@ server <- function(input, output, session) {
     }
     
     acc_clean <- acc_df |>
-      select(ModelName, .model, .type, everything()) |>
-      rename(
-        Model = .model,
-        Type  = .type
-      )
+      select(ModelName, Varietal, RMSE, ME, c(MAE:MAPE)) |>
+      arrange(RMSE)
     
     acc_clean |>
       gt() |>
@@ -670,7 +870,7 @@ server <- function(input, output, session) {
   })
   
   ##############################
-  # Tab 3: Forecasting
+  # Tab 3: Validation
   ##############################
   
   output$forecast_model_choices_ui <- renderUI({
@@ -681,7 +881,7 @@ server <- function(input, output, session) {
     
     checkboxGroupInput(
       inputId = "forecast_models",
-      label = "Select models to compare",
+      label = "Select models to validate",
       choices = names(current_models),
       selected = head(names(current_models), 1)
     )
@@ -726,8 +926,6 @@ server <- function(input, output, session) {
     req(length(current_models) > 0, input$forecast_models)
     
     chosen_keys <- input$forecast_models
-    # Note: We allow generating metrics for ALL selected models (up to 10 logic in table)
-    # but the plot will restrict itself.
     
     res <- list()
     
@@ -753,7 +951,7 @@ server <- function(input, output, session) {
   output$forecast_metrics <- render_gt({
     res <- forecast_results()
     if (length(res) == 0) {
-      return(gt(tibble(Message = "No forecasts computed yet.")))
+      return(gt(tibble(Message = "No validation forecasts computed yet.")))
     }
     
     # Limit metrics table to 10 for readability if many selected
@@ -773,11 +971,8 @@ server <- function(input, output, session) {
       bind_rows()
     
     metrics_clean <- all_metrics |>
-      select(ModelName, .model, .type, everything()) |>
-      rename(
-        Model = .model,
-        Type  = .type
-      )
+      select(ModelName, Varietal, RMSE, ME, c(MAE:MAPE)) |>
+      arrange(RMSE)
     
     metrics_clean |>
       gt() |>
@@ -807,7 +1002,6 @@ server <- function(input, output, session) {
       fc_object <- res[[k]]$forecast
       
       # Identify the varietal for this specific model's forecast
-      # (The forecast object preserves the Key from the tsibble)
       var_name <- fc_object |> 
         distinct(Varietal) |> 
         pull(Varietal)
@@ -820,15 +1014,14 @@ server <- function(input, output, session) {
         hist_data <- hist_data |> filter(year(Month) >= clarity_year)
       }
       
-      # Create individual plot
-      # autoplot(fc_object) automatically handles prediction intervals
+      # autoplot with forecast object + autolayer with historical data
       p <- fc_object |>
         autoplot() +
         autolayer(hist_data, Sales, colour = "gray20") +
         theme_minimal() +
         labs(
           title = k,
-          x = NULL, # Clean up x-axis for stacked plots
+          x = NULL, 
           y = "Sales"
         ) +
         theme(legend.position = "right")
@@ -836,7 +1029,113 @@ server <- function(input, output, session) {
       return(p)
     })
     
-    # Stack plots vertically using Patchwork
+    wrap_plots(plot_list, ncol = 1)
+  })
+  
+  ##############################
+  # Tab 4: Forecast (Future)
+  ##############################
+  
+  output$future_model_choices_ui <- renderUI({
+    current_models <- built_models()
+    if (length(current_models) == 0) {
+      return(helpText("No models built yet. Build at least one model in the 'Model Building' tab."))
+    }
+    
+    checkboxGroupInput(
+      inputId = "future_models",
+      label = "Select models to forecast",
+      choices = names(current_models),
+      selected = head(names(current_models), 1)
+    )
+  })
+  
+  output$future_clarity_year_ui <- renderUI({
+    # For Future Forecast, we can show any year available in history as a start point
+    selectInput(
+      inputId = "future_clarity_year",
+      label = "Optional: clarity cutoff year for plotting historical data",
+      choices = c("None" = "", year_choices),
+      selected = ""
+    )
+  })
+  
+  future_results <- eventReactive(input$run_future_forecast, {
+    req(input$future_models, input$future_horizon_months)
+    
+    current_models <- built_models()
+    chosen_keys    <- input$future_models
+    h_months       <- input$future_horizon_months
+    
+    res <- list()
+    
+    for (k in chosen_keys) {
+      # 1. Get the original model (trained on partial data)
+      old_model <- current_models[[k]]
+      
+      # 2. Get the specific varietal for this model to subset the FULL data correctly
+      #    (The mable 'old_model' contains the Varietal as a key)
+      var_key <- old_model |> distinct(Varietal) |> pull(Varietal)
+      
+      full_data_varietal <- wine_ts |> filter(Varietal == var_key)
+      
+      # 3. Refit the model to the FULL dataset.
+      #    reestimate = TRUE ensures parameters are optimized for the full history
+      new_model <- old_model |>
+        refit(full_data_varietal, reestimate = TRUE)
+      
+      # 4. Forecast into the future
+      fc <- new_model |>
+        forecast(h = h_months)
+      
+      res[[k]] <- list(
+        forecast = fc
+      )
+    }
+    
+    res
+  })
+  
+  output$future_plot <- renderPlot({
+    res <- future_results()
+    if (length(res) == 0) return(NULL)
+    
+    # CONSTRAINT: Only plot the top 4 chosen models
+    chosen_keys <- head(names(res), 4)
+    
+    clarity_year <- input$future_clarity_year
+    clarity_year <- if (!is.null(clarity_year) && nzchar(clarity_year)) as.numeric(clarity_year) else NA_real_
+    
+    plot_list <- map(chosen_keys, function(k) {
+      
+      fc_object <- res[[k]]$forecast
+      
+      var_name <- fc_object |> 
+        distinct(Varietal) |> 
+        pull(Varietal)
+      
+      hist_data <- wine_ts |> 
+        filter(Varietal == var_name)
+      
+      if (!is.na(clarity_year)) {
+        hist_data <- hist_data |> filter(year(Month) >= clarity_year)
+      }
+      
+      # autoplot with forecast object + autolayer with historical data
+      p <- fc_object |>
+        autoplot() +
+        autolayer(hist_data, Sales, colour = "gray20") +
+        theme_minimal() +
+        labs(
+          title = paste("Forecast:", k),
+          x = NULL, 
+          y = "Sales"
+        ) +
+        theme(legend.position = "right")
+      
+      return(p)
+    })
+    
     wrap_plots(plot_list, ncol = 1)
   })
 }

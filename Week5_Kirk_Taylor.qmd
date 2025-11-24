@@ -1,0 +1,63 @@
+---
+title: "Storytelling with Shiny"
+author: "Taylor Kirk"
+date: today
+format:
+  pdf:
+    toc: false
+    geometry: ["margin=0.5in"]
+    header-includes:
+      - \makeatletter 
+      - \patchcmd{\@maketitle}{\LARGE}{\small}{}{}
+      - \makeatother
+execute:
+  echo: false
+  warning: false
+  message: false
+bibliography: references.bib
+---
+
+## Part I — Links and Description
+
+-   **Deployed Shiny App URL:** <https://...>
+-   **Code URL:**
+    -   GitHub repository: <https://github.com/tkbarb10/aus-wine-sales.git>
+
+**App Description:**
+
+*This Shiny application facilitates the exploration, modeling, and forecasting of Australian wine sales from 1980 through 1994. It enables users to visualize time series decompositions, compare automated versus custom parameter models (ETS, ARIMA, TSLM), and validate accuracy using hold-out sets. These models can then be used to project and compare future sales trends for up to 24 months.*
+
+**App Features:**
+
+-  *Visualize sales trends across custom date ranges for single or multiple varietals*
+-  *Inspect STL decompositions to isolate trend and seasonal components*
+-  *Set variable forecast horizons (1-5 years) to define training and validation splits*
+-  *Build ETS, ARIMA, or TSLM models using either auto-selection or manual parameter tuning*
+-  *Compare training and validation metrics across all models to assess performance*
+-  *Generate detailed specification reports for individual models*
+-  *Visualize validation performance for up to 4 models against held-out data*
+-  *Forecast future sales for up to 2 years using models refitted to the full data set*
+
+## Part II — Data Story
+
+Sales of Fortified wine in Australia declined through the entire time period of the available.  This is accompanied by an increase of Dry White and Red varietal.  This trend can be explained largely by an increase in the popularity of easier to produce table wines and in part due to increased competition from other alcoholic beverages [@boobota_fortified_2025].  This decrease is best modeled by a SARIMA model, specifications listed below.
+
+![ARIMA Model Specs](images/arima_specs.png){width=35%}
+![ARIMA Model Parameters](images/arima_coeffs.png){width=35%}
+
+The chosen SARIMA model has one non-seasonal moving average (MA) term, and a seasonal term for autoregressive (AR) and MA.  The model also includes a drift term of -80.19, highlighting the decreasing trend in sales.
+
+![Fortfied Wine (middle) Compared to Dry White (top) and Red (bottom)](images/time_series.png){width=80%}
+
+In this time series comparison,  we can see the declining trend of Fortified wine sales is mirrored by an increasing trend for White and Red varietals.
+
+![Model Validation Comparison](images/validation.png){width=50%}
+
+Three separate models were built for comparison with a training split of 2 years. The ARIMA model has the lowest RMSE but also has the lowest ME by a large margin, indicating less drastic mistakes than either of the other models
+
+![Model performance on validation data](images/forecast.png){width=80%}
+
+We can see from the visuals that ETS and TSLM models perform better over certain time frames (ETS for example captures the change from Nov 1993 to Feb 1994 better than the other two), but the ARIMA model is better able to capture the seasonal trend, leading to lower errors overall.
+
+## References
+
