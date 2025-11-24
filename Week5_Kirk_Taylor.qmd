@@ -5,12 +5,17 @@ date: today
 format:
   pdf:
     toc: false
-    geometry: ["margin=0.5in"]
+    geometry:
+      - "left=0.5in"
+      - "right=0.5in"
+      - "top=0.3in"
+      - "bottom=0.3in"
     header-includes:
       - \usepackage{float}
       - \makeatletter 
       - \patchcmd{\@maketitle}{\LARGE}{\small}{}{}
       - \makeatother
+      - \vspace{-3cm}
 execute:
   echo: false
   warning: false
@@ -26,49 +31,55 @@ bibliography: references.bib
 
 **App Description:**
 
-*This Shiny application facilitates the exploration, modeling, and forecasting of Australian wine sales from 1980 through 1994. It enables users to visualize time series decompositions, compare automated versus custom parameter models (ETS, ARIMA, TSLM), and validate accuracy using hold-out sets. These models can then be used to project and compare future sales trends for up to 24 months.*
+This Shiny application facilitates the exploration, modeling, and forecasting of Australian wine sales from 1980 through 1994. It enables users to visualize time series decompositions, compare automated versus custom parameter models (ETS, ARIMA, TSLM), and validate accuracy using hold-out sets. These models can then be used to project and compare future sales trends for up to 24 months.
 
 **App Features:**
 
--   *Visualize sales trends across custom date ranges for single or multiple varietals*
--   *Inspect STL decompositions to isolate trend and seasonal components*
--   *Set variable forecast horizons (1-5 years) to define training and validation splits*
--   *Build ETS, ARIMA, or TSLM models using either auto-selection or manual parameter tuning*
--   *Compare training and validation metrics across all models to assess performance*
--   *Generate detailed specification reports for individual models*
--   *Visualize validation performance for up to 4 models against held-out data*
--   *Forecast future sales for up to 2 years using models refitted to the full data set*
+-   Visualize sales trends across custom date ranges for single or multiple varietals
+-   Inspect STL decompositions to isolate trend and seasonal components
+-   Set variable forecast horizons (1-5 years) to define training and validation splits
+-   Build ETS, ARIMA, or TSLM models using either auto-selection or manual parameter tuning
+-   Compare training and validation metrics across all models to assess performance
+-   Generate detailed specification reports for individual models
+-   Visualize validation performance for up to 4 models against held-out data
+-   Forecast future sales for up to 2 years using models refitted to the full data set
 
 ## Part II — Data Story
 
-Sales of Fortified wine in Australia declined through the entire time period of the available. This is accompanied by an increase of Dry White and Red varietal. This trend can be explained largely by an increase in the popularity of easier to produce table wines and in part due to increased competition from other alcoholic beverages [@boobota_fortified_2025]. This decrease is best modeled by a SARIMA model, specifications listed below.
+Sales of Fortified wine in Australia suffered a structural decline throughout the 1980s and early 90s. This contrasts sharply with the rising popularity of Dry White and Red varietals, driven by changing consumer tastes and competition from other alcohol types [@boobota_fortified_2025]. This can be easily seen in the time series comparison below of the 3 varietals.
 
-::: {layout-ncol=2 fig-pos="H"}
-![ARIMA Structure](images/arima_specs.png)  
+![Fortfied Wine (middle) Compared to Dry White (top) and Red (bottom)](images/time_series.png){width="80%"}
 
-![Model Coefficients](images/arima_coeffs.png)  
-:::  
+#### Modeling
+
+To quantify this decay, I compared ETS, TSLM, and ARIMA models. A SARIMA(1,1,1)(1,0,1)\[12\] model proved superior.
+
+::: {layout-ncol="2" fig-pos="H"}
+![ARIMA Structure](images/arima_specs.png)
+
+![Model Coefficients](images/arima_coeffs.png)
+:::
 
 The chosen SARIMA model has one non-seasonal moving average (MA) term, and a seasonal term for autoregressive (AR) and MA. The model also includes a drift term of -80.19, highlighting the decreasing trend in sales.
 
-![Fortfied Wine (middle) Compared to Dry White (top) and Red (bottom)](images/time_series.png){width="85%"}
+#### Validation Metric Comparison
 
-In this time series comparison, we can see the declining trend of Fortified wine sales is mirrored by an increasing trend for White and Red varietals.
+![Model Validation Comparison](images/validation.png){width="50%"}
 
-![Model Validation Comparison](images/validation.png){fig-align="left" width="50%"}
+Validating against a 2-year hold-out set (1992–1994), the ARIMA model achieved the lowest RMSE. The ME is negative but small, indicating a slight bias to over-predict. The ETS model shows a large bias to the upside, perhaps indicating it's not capturing the declining trend well.
 
-Three separate models were built for comparison with a training split of 2 years. The ARIMA model has the lowest RMSE.  The ME is negative but small, indicating a slight bias to over-predict.  The ETS model shows a large bias to the upside, perhaps indicating it's not capturing the declining trend well.
+![Model performance on validation data](images/forecast.png){width="80%"}
 
-![Model performance on validation data](images/forecast.png){width="85%"}
+We can see from the visuals that ETS and TSLM models perform better over certain time frames (ETS for example captures the change from Nov 1993 to Feb 1994 better than the other two), but the ARIMA model is better able to capture the seasonal trend, leading to lower errors overall.
 
-We can see from the visuals that ETS and TSLM models perform better over certain time frames (ETS for example captures the change from Nov 1993 to Feb 1994 better than the other two), but the ARIMA model is better able to capture the seasonal trend, leading to lower errors overall
+#### Conclusion
 
-The Fortified wine industry is in a critical state of contraction. By utilizing a SARIMA model with a negative drift term, stakeholders can accurately project this continued decay, preventing inventory overstock that would result from using naive or purely seasonal models.
+Using the app's Forecast tab to project into 1995, the model predicts Fortified sales will continue to fall. Stakeholders should use this SARIMA drift specification to manage inventory reduction, as simpler seasonal models will likely overestimate future demand.
 
-## Steps to reproduce above outputs in app
+#### Steps to reproduce above outputs in app
 
-- **Time Series Comparison**: Explore tab, choose Dry White, Fortified and Red varietals in left sidebar
-- **Model Specs/Report**: Model Building Tab, choose 2 years for forecast horizon (default), the Fortified wine varietal, ARIMA auto (default) and select the model in the report in the sidebar
-- **Validation Comparison**: Build the 3 models in the Building tab, then in the Validation tab, choose the 3 models in the left sidebar and click on Run Validation 
+-   **Time Series Comparison**: Explore tab, choose Dry White, Fortified and Red varietals in left sidebar
+-   **Model Specs/Report**: Model Building Tab, choose 2 years for forecast horizon (default), the Fortified wine varietal, ARIMA auto (default) and select the model in the report in the sidebar
+-   **Validation Comparison**: Build the 3 models in the Building tab, then in the Validation tab, choose the 3 models in the left sidebar and click on Run Validation
 
 ## References
